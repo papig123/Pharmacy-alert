@@ -28,6 +28,29 @@
     --blue-bg: #edf2fa;
     --mono: 'DM Mono', monospace;
     --sans: 'Noto Sans TC', sans-serif;
+    --cat-drug: #1a4d8f; --cat-drug-bg: #edf2fa;
+    --cat-chem: #6b3fa0; --cat-chem-bg: #f3eefa;
+    --cat-diaper: #c0682b; --cat-diaper-bg: #fdf0e8;
+    --cat-baby: #2d6a4f; --cat-baby-bg: #eaf4ef;
+  }
+
+  @media (max-width: 680px) {
+    .shell { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: relative; flex-direction: row; flex-wrap: wrap; }
+    .sidebar-logo { padding: 14px 16px 12px; border-bottom: none; border-right: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-logo .logo-title { font-size: 13px; }
+    .nav { display: flex; flex-direction: row; padding: 0; overflow-x: auto; flex: 1; }
+    .nav-item { padding: 12px 14px; border-left: none; border-bottom: 3px solid transparent; white-space: nowrap; font-size: 12px; flex-shrink: 0; }
+    .nav-item.active { border-bottom-color: #7ec8a0; border-left-color: transparent; }
+    .main { padding: 16px; }
+    .metrics { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+    .metric-value { font-size: 22px; }
+    .form-grid { grid-template-columns: 1fr 1fr; }
+    .form-grid-2 { grid-template-columns: 1fr; }
+    .page-header h1 { font-size: 18px; }
+    thead th, tbody td { padding: 8px 10px; font-size: 12px; }
+    .alert-card { padding: 12px 14px; }
+    .card { padding: 16px; }
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -286,6 +309,11 @@
   .tag-gray { background: var(--surface2); color: var(--text3); }
   .tag-blue { background: var(--blue-bg); color: var(--blue); }
 
+  .tag-drug  { background: var(--cat-drug-bg);  color: var(--cat-drug); }
+  .tag-chem  { background: var(--cat-chem-bg);  color: var(--cat-chem); }
+  .tag-diaper{ background: var(--cat-diaper-bg);color: var(--cat-diaper); }
+  .tag-baby  { background: var(--cat-baby-bg);  color: var(--cat-baby); }
+
   /* Empty state */
   .empty { text-align: center; padding: 48px; color: var(--text3); font-size: 13px; }
 
@@ -430,6 +458,19 @@
         <div class="card-title">新增到貨批次</div>
         <div class="form-grid">
           <div class="field">
+            <label>商品編號</label>
+            <input type="text" id="a-code" placeholder="如：A001"/>
+          </div>
+          <div class="field">
+            <label>分類</label>
+            <select id="a-category">
+              <option value="藥品">藥品</option>
+              <option value="化工">化工</option>
+              <option value="奶褲">奶褲</option>
+              <option value="嬰品">嬰品</option>
+            </select>
+          </div>
+          <div class="field">
             <label>商品名稱</label>
             <input type="text" id="a-name" placeholder="如：普拿疼 500mg" list="product-list"/>
             <datalist id="product-list"></datalist>
@@ -469,7 +510,7 @@
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>商品名稱</th><th>廠商</th><th>批號</th>
+              <th>編號</th><th>分類</th><th>商品名稱</th><th>廠商</th><th>批號</th>
               <th>到貨量</th><th>有效期限</th><th>退貨截止</th><th>狀態</th><th></th>
             </tr></thead>
             <tbody id="arrival-table"></tbody>
@@ -488,7 +529,22 @@
         <div style="display:flex;gap:10px;align-items:center;">
           <input type="text" id="inv-search" placeholder="搜尋商品名稱或廠商..." oninput="renderInventory()"
             style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:var(--bg);">
+          <select id="inv-cat" onchange="renderInventory()"
+            style="padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);outline:none;">
+            <option value="">全部分類</option>
+            <option value="藥品">藥品</option>
+            <option value="化工">化工</option>
+            <option value="奶褲">奶褲</option>
+            <option value="嬰品">嬰品</option>
+          </select>
           <select id="inv-filter" onchange="renderInventory()"
+            style="padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);outline:none;">
+            <option value="">全部狀態</option>
+            <option value="urgent">緊急</option>
+            <option value="warning">注意</option>
+            <option value="ok">正常</option>
+            <option value="no-return">不可退</option>
+          </select>
             style="padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);outline:none;">
             <option value="">全部狀態</option>
             <option value="urgent">緊急</option>
@@ -501,7 +557,7 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>商品名稱</th><th>廠商</th><th>批號</th><th>庫存量</th>
+            <th>編號</th><th>分類</th><th>商品名稱</th><th>廠商</th><th>批號</th><th>庫存量</th>
             <th>日均銷量</th><th>預估賣完</th><th>有效期限</th><th>退貨截止</th><th>狀態</th>
           </tr></thead>
           <tbody id="inventory-table"></tbody>
@@ -639,10 +695,10 @@ let vendors = load('vendors', [
   { id: 3, name: '永信藥品', rule: 'no', months: null, note: '不受理退貨' },
 ]);
 let arrivals = load('arrivals', [
-  { id: 1, name: '普拿疼 500mg', vendor: '杏輝藥品', batch: 'LOT240301', qty: 120, expiry: '2025-06-30', deadline: '2025-03-30', canReturn: true },
-  { id: 2, name: '胃腸藥錠', vendor: '健亞生技', batch: 'LOT240210', qty: 60, expiry: '2025-04-15', deadline: '2025-02-15', canReturn: true },
-  { id: 3, name: '維他命C 500mg', vendor: '永信藥品', batch: 'LOT240101', qty: 200, expiry: '2026-12-31', deadline: null, canReturn: false },
-  { id: 4, name: '感冒糖漿', vendor: '杏輝藥品', batch: 'LOT240501', qty: 48, expiry: '2025-10-31', deadline: '2025-07-31', canReturn: true },
+  { id: 1, code: 'A001', category: '藥品', name: '普拿疼 500mg', vendor: '杏輝藥品', batch: 'LOT240301', qty: 120, expiry: '2025-06-30', deadline: '2025-03-30', canReturn: true },
+  { id: 2, code: 'A002', category: '藥品', name: '胃腸藥錠', vendor: '健亞生技', batch: 'LOT240210', qty: 60, expiry: '2025-04-15', deadline: '2025-02-15', canReturn: true },
+  { id: 3, code: 'B001', category: '化工', name: '維他命C 500mg', vendor: '永信藥品', batch: 'LOT240101', qty: 200, expiry: '2026-12-31', deadline: null, canReturn: false },
+  { id: 4, code: 'C001', category: '奶褲', name: '感冒糖漿', vendor: '杏輝藥品', batch: 'LOT240501', qty: 48, expiry: '2025-10-31', deadline: '2025-07-31', canReturn: true },
 ]);
 let salesMap = load('salesMap', { '普拿疼 500mg': 4.2, '胃腸藥錠': 1.8, '維他命C 500mg': 5.0, '感冒糖漿': 2.1 });
 let nextVId = load('nextVId', 4);
@@ -669,6 +725,11 @@ function getStatus(a) {
   if (d <= 7) return 'urgent';
   if (d <= 14) return 'warning';
   return 'ok';
+}
+function catTag(cat) {
+  const map = { '藥品': 'drug', '化工': 'chem', '奶褲': 'diaper', '嬰品': 'baby' };
+  const cls = map[cat] || 'gray';
+  return `<span class="tag tag-${cls}">${cat||'—'}</span>`;
 }
 function statusTag(a) {
   if (!a.canReturn) return `<span class="tag tag-gray">不可退</span>`;
@@ -728,8 +789,9 @@ function renderDashboard() {
       const cls = getStatus(a) === 'urgent' ? 'urgent' : 'warning';
       return `<div class="alert-card ${cls}">
         <div>
-          <div class="alert-product">${a.name}</div>
+          <div class="alert-product">${a.name} <span class="mono" style="font-size:11px;color:var(--text3);font-weight:400">${a.code||''}</span></div>
           <div class="alert-meta">
+            <span>${catTag(a.category)}</span>
             <span>🏭 ${a.vendor}</span>
             <span>📦 庫存 ${a.qty}</span>
             <span>📅 效期 ${fmt(a.expiry)}</span>
@@ -748,8 +810,9 @@ function renderDashboard() {
   document.getElementById('dash-ok').innerHTML = ok.length
     ? ok.map(a => `<div class="alert-card ${getStatus(a) === 'no-return' ? 'no-return' : 'ok'}">
         <div>
-          <div class="alert-product">${a.name}</div>
+          <div class="alert-product">${a.name} <span class="mono" style="font-size:11px;color:var(--text3);font-weight:400">${a.code||''}</span></div>
           <div class="alert-meta">
+            <span>${catTag(a.category)}</span>
             <span>🏭 ${a.vendor}</span>
             <span>📦 庫存 ${a.qty}</span>
             <span>📅 效期 ${fmt(a.expiry)}</span>
@@ -801,6 +864,8 @@ document.getElementById('a-expiry').addEventListener('change', calcDeadline);
 
 function addArrival() {
   const name = document.getElementById('a-name').value.trim();
+  const code = document.getElementById('a-code').value.trim();
+  const category = document.getElementById('a-category').value;
   const vendorName = document.getElementById('a-vendor').value;
   const batch = document.getElementById('a-batch').value.trim();
   const qty = parseInt(document.getElementById('a-qty').value);
@@ -811,7 +876,7 @@ function addArrival() {
   const canReturn = v && v.rule !== 'no';
   const deadline = canReturn ? addMonths(expiry, v.months) : null;
 
-  arrivals.unshift({ id: nextAId++, name, vendor: vendorName, batch: batch || '—', qty, expiry, deadline, canReturn });
+  arrivals.unshift({ id: nextAId++, code, category, name, vendor: vendorName, batch: batch || '—', qty, expiry, deadline, canReturn });
   persist();
   renderArrivalTable();
   clearArrivalForm();
@@ -819,8 +884,9 @@ function addArrival() {
 }
 
 function clearArrivalForm() {
-  ['a-name','a-batch','a-qty','a-expiry','a-deadline'].forEach(id => document.getElementById(id).value = '');
+  ['a-name','a-code','a-batch','a-qty','a-expiry','a-deadline'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('a-vendor').value = '';
+  document.getElementById('a-category').value = '藥品';
   document.getElementById('a-rule-hint').style.display = 'none';
 }
 
@@ -835,6 +901,8 @@ function renderArrivalTable() {
   if (!arrivals.length) { tb.innerHTML = '<tr><td colspan="8" class="empty">尚無到貨紀錄</td></tr>'; return; }
   tb.innerHTML = arrivals.slice(0, 20).map(a => `
     <tr>
+      <td class="mono">${a.code||'—'}</td>
+      <td>${catTag(a.category)}</td>
       <td style="font-weight:500">${a.name}</td>
       <td>${a.vendor}</td>
       <td class="mono">${a.batch}</td>
@@ -850,19 +918,22 @@ function renderArrivalTable() {
 function renderInventory() {
   const q = document.getElementById('inv-search').value.toLowerCase();
   const f = document.getElementById('inv-filter').value;
+  const cat = document.getElementById('inv-cat').value;
   let data = arrivals.filter(a => {
-    const match = a.name.toLowerCase().includes(q) || a.vendor.toLowerCase().includes(q);
+    const match = a.name.toLowerCase().includes(q) || a.vendor.toLowerCase().includes(q) || (a.code||'').toLowerCase().includes(q);
     const st = getStatus(a);
-    return match && (!f || st === f);
+    return match && (!f || st === f) && (!cat || a.category === cat);
   });
   const tb = document.getElementById('inventory-table');
-  if (!data.length) { tb.innerHTML = '<tr><td colspan="9" class="empty">沒有符合條件的批次</td></tr>'; return; }
+  if (!data.length) { tb.innerHTML = '<tr><td colspan="11" class="empty">沒有符合條件的批次</td></tr>'; return; }
   tb.innerHTML = data.map(a => {
     const rate = salesMap[a.name];
     const days = estSellDays(a);
     const dl = daysFrom(a.deadline);
     const sellWarn = rate && days && a.deadline && days > dl;
     return `<tr>
+      <td class="mono">${a.code||'—'}</td>
+      <td>${catTag(a.category)}</td>
       <td style="font-weight:500">${a.name}</td>
       <td style="color:var(--text2)">${a.vendor}</td>
       <td class="mono">${a.batch}</td>
