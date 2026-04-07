@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>效期退貨警示系統</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f3ef;
+    --surface: #ffffff;
+    --surface2: #f0ede8;
+    --border: #e0dbd2;
+    --border2: #ccc8be;
+    --text: #1a1814;
+    --text2: #6b6760;
+    --text3: #9e9b95;
+    --accent: #2d4a3e;
+    --accent-light: #e8f0ec;
+    --red: #c0392b;
+    --red-bg: #fdf0ee;
+    --amber: #b7720a;
+    --amber-bg: #fdf6e8;
+    --green: #2d6a4f;
+    --green-bg: #eaf4ef;
+    --blue: #1a4d8f;
+    --blue-bg: #edf2fa;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Noto Sans TC', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* Layout */
+  .shell { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    background: var(--accent);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .sidebar-logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .sidebar-logo .logo-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .sidebar-logo .logo-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: #fff;
+    line-height: 1.3;
+  }
+
+  .nav { padding: 12px 0; flex: 1; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    font-weight: 400;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+    user-select: none;
+  }
+  .nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .nav-item.active { color: #fff; border-left-color: #7ec8a0; background: rgba(255,255,255,0.1); font-weight: 500; }
+  .nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+  .nav-item.active .nav-icon { opacity: 1; }
+
+  .main { flex: 1; padding: 32px 36px; overflow-x: hidden; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Page header */
+  .page-header { margin-bottom: 28px; }
+  .page-header h1 { font-size: 22px; font-weight: 500; color: var(--text); }
+  .page-header p { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  /* Metrics row */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .metric-label { font-size: 11px; color: var(--text3); letter-spacing: 0.05em; margin-bottom: 8px; text-transform: uppercase; }
+  .metric-value { font-family: var(--mono); font-size: 28px; font-weight: 500; line-height: 1; }
+  .metric-value.red { color: var(--red); }
+  .metric-value.amber { color: var(--amber); }
+  .metric-value.green { color: var(--green); }
+  .metric-value.blue { color: var(--blue); }
+
+  /* Alert cards */
+  .alert-section { margin-bottom: 24px; }
+  .alert-section-title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .alert-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .alert-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+    transition: box-shadow 0.15s;
+  }
+  .alert-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .alert-card.urgent { border-left: 3px solid var(--red); }
+  .alert-card.warning { border-left: 3px solid var(--amber); }
+  .alert-card.ok { border-left: 3px solid #7ec8a0; }
+  .alert-card.no-return { border-left: 3px solid var(--border2); opacity: 0.7; }
+
+  .alert-product { font-weight: 500; font-size: 14px; margin-bottom: 3px; }
+  .alert-meta { font-size: 12px; color: var(--text2); display: flex; gap: 14px; flex-wrap: wrap; }
+  .alert-meta span { display: flex; align-items: center; gap: 4px; }
+
+  .alert-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-gray { background: var(--surface2); color: var(--text3); }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    background: var(--surface2);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text3);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 10px 14px; color: var(--text); vertical-align: middle; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+
+  /* Forms */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 24px;
+    margin-bottom: 16px;
+  }
+  .card-title { font-size: 14px; font-weight: 500; margin-bottom: 16px; color: var(--text); }
+
+  .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-full { grid-column: 1 / -1; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; font-weight: 500; color: var(--text2); letter-spacing: 0.04em; text-transform: uppercase; }
+  .field input, .field select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); background: #fff; }
+  .field input[type="number"] { font-family: var(--mono); }
+
+  .btn {
+    padding: 9px 18px;
+    border-radius: 7px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #1e3328; }
+  .btn-secondary {
+    background: none;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+  }
+  .btn-secondary:hover { background: var(--surface2); color: var(--text); }
+  .btn-danger { background: none; border: 1px solid #f5c6c2; color: var(--red); font-size: 12px; padding: 5px 10px; }
+  .btn-danger:hover { background: var(--red-bg); }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 18px; align-items: center; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border2);
+    border-radius: 10px;
+    padding: 36px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg);
+  }
+  .upload-zone:hover { border-color: var(--accent); background: var(--accent-light); }
+  .upload-zone.dragover { border-color: var(--accent); background: var(--accent-light); }
+  .upload-icon { font-size: 32px; margin-bottom: 10px; }
+  .upload-label { font-size: 14px; font-weight: 500; color: var(--text2); margin-bottom: 4px; }
+  .upload-hint { font-size: 12px; color: var(--text3); }
+
+  /* Status dots */
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .dot-red { background: var(--red); }
+  .dot-amber { background: var(--amber); }
+  .dot-green { background: #7ec8a0; }
+  .dot-gray { background: var(--border2); }
+
+  /* Tag */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .tag-red { background: var(--red-bg); color: var(--red); }
+  .tag-amber { background: var(--amber-bg); color: var(--amber); }
+  .tag-green { background: var(--green-bg); color: var(--green); }
+  .tag-gray { background: var(--surface2); color: var(--text3); }
+  .tag-blue { background: var(--blue-bg); color: var(--blue); }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 48px; color: var(--text3); font-size: 13px; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--accent); color: #fff;
+    padding: 12px 20px; border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transform: translateY(8px);
+    transition: all 0.25s; pointer-events: none;
+    z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 2px; margin-bottom: 20px; background: var(--surface2); padding: 4px; border-radius: 8px; width: fit-content; }
+  .tab-btn {
+    padding: 7px 16px; border-radius: 6px; border: none; background: none;
+    font-family: var(--sans); font-size: 13px; cursor: pointer;
+    color: var(--text2); transition: all 0.15s;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  .import-result {
+    margin-top: 16px; padding: 14px 16px;
+    background: var(--green-bg); border: 1px solid #a8d5be;
+    border-radius: 8px; font-size: 13px; color: var(--green);
+    display: none;
+  }
+
+  .progress-bar-wrap { background: var(--border); border-radius: 4px; height: 4px; margin-top: 8px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
+
+  @media (max-width: 900px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .form-grid { grid-template-columns: 1fr 1fr; }
+    .sidebar { width: 180px; }
+    .main { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-label">藥局管理</div>
+      <div class="logo-title">效期退貨<br>警示系統</div>
+    </div>
+    <div class="nav">
+      <div class="nav-item active" onclick="showPage('dashboard')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/>
+          <rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/>
+        </svg>
+        警示儀表板
+      </div>
+      <div class="nav-item" onclick="showPage('arrival')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8 2v8M4 7l4 3 4-3"/><path d="M2 13h12"/>
+        </svg>
+        到貨登記
+      </div>
+      <div class="nav-item" onclick="showPage('inventory')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="3" width="14" height="11" rx="1.5"/>
+          <path d="M5 3V2M11 3V2M1 7h14"/>
+        </svg>
+        庫存效期總覽
+      </div>
+      <div class="nav-item" onclick="showPage('sales')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 12l4-4 3 3 5-6"/><circle cx="14" cy="5" r="1.5"/>
+        </svg>
+        銷售資料匯入
+      </div>
+      <div class="nav-item" onclick="showPage('vendors')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 4h12v8a1 1 0 01-1 1H3a1 1 0 01-1-1V4z"/>
+          <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1"/>
+        </svg>
+        廠商退貨設定
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Dashboard -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <h1>警示儀表板</h1>
+        <p id="dash-date"></p>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">需立即退貨</div>
+          <div class="metric-value red" id="m-urgent">0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">14天內截止</div>
+          <div class="metric-value amber" id="m-soon">0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">庫存批次總數</div>
+          <div class="metric-value blue" id="m-total">0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">狀態正常</div>
+          <div class="metric-value green" id="m-ok">0</div>
+        </div>
+      </div>
+
+      <div id="dash-urgent-section" class="alert-section">
+        <div class="alert-section-title">緊急：退貨截止已過或剩 7 天內</div>
+        <div id="dash-urgent"></div>
+      </div>
+
+      <div id="dash-warn-section" class="alert-section">
+        <div class="alert-section-title">注意：退貨截止剩 8–14 天</div>
+        <div id="dash-warn"></div>
+      </div>
+
+      <div class="alert-section">
+        <div class="alert-section-title">其餘批次狀態</div>
+        <div id="dash-ok"></div>
+      </div>
+    </div>
+
+    <!-- Arrival -->
+    <div id="page-arrival" class="page">
+      <div class="page-header">
+        <h1>到貨登記</h1>
+        <p>每次收貨後輸入以下資訊，系統自動計算退貨截止日</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">新增到貨批次</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>商品名稱</label>
+            <input type="text" id="a-name" placeholder="如：普拿疼 500mg" list="product-list"/>
+            <datalist id="product-list"></datalist>
+          </div>
+          <div class="field">
+            <label>廠商</label>
+            <select id="a-vendor">
+              <option value="">— 選擇廠商 —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>批號（選填）</label>
+            <input type="text" id="a-batch" placeholder="如：LOT240601"/>
+          </div>
+          <div class="field">
+            <label>到貨數量</label>
+            <input type="number" id="a-qty" min="1" placeholder="0"/>
+          </div>
+          <div class="field">
+            <label>有效期限</label>
+            <input type="date" id="a-expiry"/>
+          </div>
+          <div class="field">
+            <label>退貨截止日（自動計算）</label>
+            <input type="text" id="a-deadline" readonly placeholder="選廠商與效期後自動帶入" style="color:var(--text2);cursor:default;"/>
+          </div>
+        </div>
+        <div id="a-rule-hint" style="margin-top:10px;font-size:12px;color:var(--text3);display:none;"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="addArrival()">登記到貨</button>
+          <button class="btn btn-secondary" onclick="clearArrivalForm()">清除</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">最近登記紀錄</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>商品名稱</th><th>廠商</th><th>批號</th>
+              <th>到貨量</th><th>有效期限</th><th>退貨截止</th><th>狀態</th><th></th>
+            </tr></thead>
+            <tbody id="arrival-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory -->
+    <div id="page-inventory" class="page">
+      <div class="page-header">
+        <h1>庫存效期總覽</h1>
+        <p>所有批次的效期與退貨狀態一覽</p>
+      </div>
+      <div class="card" style="padding:14px 18px;">
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input type="text" id="inv-search" placeholder="搜尋商品名稱或廠商..." oninput="renderInventory()"
+            style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;background:var(--bg);">
+          <select id="inv-filter" onchange="renderInventory()"
+            style="padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);outline:none;">
+            <option value="">全部狀態</option>
+            <option value="urgent">緊急</option>
+            <option value="warning">注意</option>
+            <option value="ok">正常</option>
+            <option value="no-return">不可退</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>商品名稱</th><th>廠商</th><th>批號</th><th>庫存量</th>
+            <th>日均銷量</th><th>預估賣完</th><th>有效期限</th><th>退貨截止</th><th>狀態</th>
+          </tr></thead>
+          <tbody id="inventory-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sales Import -->
+    <div id="page-sales" class="page">
+      <div class="page-header">
+        <h1>銷售資料匯入</h1>
+        <p>從 ePOS 系統匯出 Excel 後，拖曳到這裡即可自動更新各商品日均銷量</p>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchSalesTab('import', this)">匯入 Excel</button>
+        <button class="tab-btn" onclick="switchSalesTab('manual', this)">手動輸入</button>
+      </div>
+
+      <div id="sales-tab-import">
+        <div class="card">
+          <div class="card-title">匯入銷售明細</div>
+          <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+            <div class="upload-icon">📂</div>
+            <div class="upload-label">點擊或拖曳 Excel 檔案</div>
+            <div class="upload-hint">支援 .xlsx / .xls 格式，從 ePOS 「銷售報表」匯出即可</div>
+          </div>
+          <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="handleFileUpload(event)">
+
+          <div style="margin-top:16px;">
+            <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">欄位對應設定（第一次設定後記住）</div>
+            <div class="form-grid-2">
+              <div class="field">
+                <label>商品名稱欄位名稱</label>
+                <input type="text" id="col-name" value="商品名稱" placeholder="如：品名、商品"/>
+              </div>
+              <div class="field">
+                <label>銷售數量欄位名稱</label>
+                <input type="text" id="col-qty" value="銷售數量" placeholder="如：數量、qty"/>
+              </div>
+              <div class="field">
+                <label>日期欄位名稱</label>
+                <input type="text" id="col-date" value="交易日期" placeholder="如：日期、date"/>
+              </div>
+            </div>
+          </div>
+
+          <div class="import-result" id="import-result"></div>
+        </div>
+
+        <div class="card" id="preview-card" style="display:none">
+          <div class="card-title">預覽（前 5 筆）</div>
+          <div class="table-wrap" id="preview-table"></div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="confirmImport()">確認匯入，更新日均銷量</button>
+            <button class="btn btn-secondary" onclick="cancelImport()">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="sales-tab-manual" style="display:none">
+        <div class="card">
+          <div class="card-title">手動設定日均銷量</div>
+          <p style="font-size:12px;color:var(--text3);margin-bottom:16px;">如果無法匯出 Excel，可以手動輸入你估計的每日平均銷售量</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>商品名稱</th><th>目前日均銷量</th><th>修改</th></tr></thead>
+              <tbody id="manual-sales-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vendors -->
+    <div id="page-vendors" class="page">
+      <div class="page-header">
+        <h1>廠商退貨設定</h1>
+        <p>設定好各廠商規則，到貨時系統自動套用，不需重複輸入</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">新增廠商</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>廠商名稱</label>
+            <input type="text" id="v-name" placeholder="如：杏輝藥品"/>
+          </div>
+          <div class="field">
+            <label>退貨規則</label>
+            <select id="v-rule" onchange="toggleVendorRule()">
+              <option value="months">效期前 N 個月可退</option>
+              <option value="no">完全不可退</option>
+            </select>
+          </div>
+          <div class="field" id="v-months-field">
+            <label>效期前幾個月</label>
+            <input type="number" id="v-months" min="1" max="24" placeholder="如：3"/>
+          </div>
+          <div class="field" id="v-note-field" style="grid-column: span 2;">
+            <label>備註（選填）</label>
+            <input type="text" id="v-note" placeholder="如：每月10日前申請、需附批號"/>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="addVendor()">新增廠商</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>廠商名稱</th><th>退貨規則</th><th>備註</th><th>已登記批次</th><th></th>
+          </tr></thead>
+          <tbody id="vendor-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+
+// ── State (localStorage persistence) ──
+function load(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch(e) { return def; } }
+function save(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+let vendors = load('vendors', [
+  { id: 1, name: '杏輝藥品', rule: 'months', months: 3, note: '每月15日前申請' },
+  { id: 2, name: '健亞生技', rule: 'months', months: 2, note: '' },
+  { id: 3, name: '永信藥品', rule: 'no', months: null, note: '不受理退貨' },
+]);
+let arrivals = load('arrivals', [
+  { id: 1, name: '普拿疼 500mg', vendor: '杏輝藥品', batch: 'LOT240301', qty: 120, expiry: '2025-06-30', deadline: '2025-03-30', canReturn: true },
+  { id: 2, name: '胃腸藥錠', vendor: '健亞生技', batch: 'LOT240210', qty: 60, expiry: '2025-04-15', deadline: '2025-02-15', canReturn: true },
+  { id: 3, name: '維他命C 500mg', vendor: '永信藥品', batch: 'LOT240101', qty: 200, expiry: '2026-12-31', deadline: null, canReturn: false },
+  { id: 4, name: '感冒糖漿', vendor: '杏輝藥品', batch: 'LOT240501', qty: 48, expiry: '2025-10-31', deadline: '2025-07-31', canReturn: true },
+]);
+let salesMap = load('salesMap', { '普拿疼 500mg': 4.2, '胃腸藥錠': 1.8, '維他命C 500mg': 5.0, '感冒糖漿': 2.1 });
+let nextVId = load('nextVId', 4);
+let nextAId = load('nextAId', 5);
+let pendingImport = null;
+
+function persist() {
+  save('vendors', vendors); save('arrivals', arrivals);
+  save('salesMap', salesMap); save('nextVId', nextVId); save('nextAId', nextAId);
+}
+
+// ── Helpers ──
+function fmt(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('zh-TW', {year:'numeric',month:'2-digit',day:'2-digit'}); }
+function daysFrom(dateStr) { if (!dateStr) return null; const d = new Date(dateStr); return Math.floor((d - TODAY) / 86400000); }
+function addMonths(dateStr, m) {
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() - m);
+  return d.toISOString().slice(0,10);
+}
+function getStatus(a) {
+  if (!a.canReturn) return 'no-return';
+  const d = daysFrom(a.deadline);
+  if (d === null) return 'ok';
+  if (d <= 7) return 'urgent';
+  if (d <= 14) return 'warning';
+  return 'ok';
+}
+function statusTag(a) {
+  if (!a.canReturn) return `<span class="tag tag-gray">不可退</span>`;
+  const d = daysFrom(a.deadline);
+  if (d === null) return `<span class="tag tag-gray">—</span>`;
+  if (d < 0) return `<span class="tag tag-red">已超截止 ${Math.abs(d)} 天</span>`;
+  if (d <= 7) return `<span class="tag tag-red">剩 ${d} 天</span>`;
+  if (d <= 14) return `<span class="tag tag-amber">剩 ${d} 天</span>`;
+  return `<span class="tag tag-green">剩 ${d} 天</span>`;
+}
+function estSellDays(a) {
+  const rate = salesMap[a.name];
+  if (!rate || rate <= 0) return null;
+  return Math.ceil(a.qty / rate);
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── Navigation ──
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const items = document.querySelectorAll('.nav-item');
+  const map = { dashboard: 0, arrival: 1, inventory: 2, sales: 3, vendors: 4 };
+  items[map[id]].classList.add('active');
+  if (id === 'dashboard') renderDashboard();
+  if (id === 'arrival') { renderArrivalTable(); populateVendorDropdown(); }
+  if (id === 'inventory') renderInventory();
+  if (id === 'vendors') renderVendors();
+  if (id === 'sales') renderManualSales();
+}
+
+// ── Dashboard ──
+function renderDashboard() {
+  document.getElementById('dash-date').textContent = TODAY.toLocaleDateString('zh-TW', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+
+  const urgent = arrivals.filter(a => getStatus(a) === 'urgent');
+  const warn = arrivals.filter(a => getStatus(a) === 'warning');
+  const ok = arrivals.filter(a => ['ok','no-return'].includes(getStatus(a)));
+
+  document.getElementById('m-urgent').textContent = urgent.length;
+  document.getElementById('m-soon').textContent = warn.length;
+  document.getElementById('m-total').textContent = arrivals.length;
+  document.getElementById('m-ok').textContent = ok.length;
+
+  function renderCards(list, el) {
+    if (!list.length) { el.innerHTML = `<div style="font-size:12px;color:var(--text3);padding:8px 0;">無</div>`; return; }
+    el.innerHTML = list.map(a => {
+      const d = daysFrom(a.deadline);
+      const days = estSellDays(a);
+      const sell = salesMap[a.name];
+      const sellInfo = sell ? `預估 ${days} 天賣完（日均 ${sell.toFixed(1)}）` : '尚未設定銷量';
+      const cls = getStatus(a) === 'urgent' ? 'urgent' : 'warning';
+      return `<div class="alert-card ${cls}">
+        <div>
+          <div class="alert-product">${a.name}</div>
+          <div class="alert-meta">
+            <span>🏭 ${a.vendor}</span>
+            <span>📦 庫存 ${a.qty}</span>
+            <span>📅 效期 ${fmt(a.expiry)}</span>
+            <span>⚠️ 退貨截止 ${fmt(a.deadline)}</span>
+            <span style="color:${sell && days && a.deadline && days > daysFrom(a.deadline) ? 'var(--red)':'var(--text3)'}">📈 ${sellInfo}</span>
+          </div>
+        </div>
+        ${statusTag(a)}
+      </div>`;
+    }).join('');
+  }
+
+  renderCards(urgent, document.getElementById('dash-urgent'));
+  renderCards(warn, document.getElementById('dash-warn'));
+
+  document.getElementById('dash-ok').innerHTML = ok.length
+    ? ok.map(a => `<div class="alert-card ${getStatus(a) === 'no-return' ? 'no-return' : 'ok'}">
+        <div>
+          <div class="alert-product">${a.name}</div>
+          <div class="alert-meta">
+            <span>🏭 ${a.vendor}</span>
+            <span>📦 庫存 ${a.qty}</span>
+            <span>📅 效期 ${fmt(a.expiry)}</span>
+            ${a.canReturn ? `<span>✅ 截止 ${fmt(a.deadline)}，剩 ${daysFrom(a.deadline)} 天</span>` : '<span>🚫 不可退</span>'}
+          </div>
+        </div>
+        ${statusTag(a)}
+      </div>`).join('')
+    : `<div style="font-size:12px;color:var(--text3);padding:8px 0;">無</div>`;
+}
+
+// ── Arrival ──
+function populateVendorDropdown() {
+  const sel = document.getElementById('a-vendor');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— 選擇廠商 —</option>' +
+    vendors.map(v => `<option value="${v.name}">${v.name}</option>`).join('');
+  sel.value = cur;
+
+  // product datalist
+  const dl = document.getElementById('product-list');
+  const names = [...new Set(arrivals.map(a => a.name))];
+  dl.innerHTML = names.map(n => `<option value="${n}">`).join('');
+}
+
+function calcDeadline() {
+  const vendorName = document.getElementById('a-vendor').value;
+  const expiry = document.getElementById('a-expiry').value;
+  const hint = document.getElementById('a-rule-hint');
+  if (!vendorName || !expiry) { document.getElementById('a-deadline').value = ''; hint.style.display='none'; return; }
+  const v = vendors.find(x => x.name === vendorName);
+  if (!v) return;
+  if (v.rule === 'no') {
+    document.getElementById('a-deadline').value = '此廠商不可退貨';
+    hint.textContent = v.note ? `備註：${v.note}` : '此廠商商品完全不受理退貨';
+    hint.style.display = 'block';
+  } else {
+    const dl = addMonths(expiry, v.months);
+    document.getElementById('a-deadline').value = fmt(dl);
+    const d = daysFrom(dl);
+    const color = d <= 0 ? 'var(--red)' : d <= 14 ? 'var(--amber)' : 'var(--green)';
+    hint.innerHTML = `<span style="color:${color};font-weight:500">退貨截止日：${fmt(dl)}（${d >= 0 ? '剩 '+d+' 天' : '已超過 '+Math.abs(d)+' 天'}）</span>${v.note ? `　備註：${v.note}` : ''}`;
+    hint.style.display = 'block';
+  }
+}
+
+document.getElementById('a-vendor').addEventListener('change', calcDeadline);
+document.getElementById('a-expiry').addEventListener('change', calcDeadline);
+
+function addArrival() {
+  const name = document.getElementById('a-name').value.trim();
+  const vendorName = document.getElementById('a-vendor').value;
+  const batch = document.getElementById('a-batch').value.trim();
+  const qty = parseInt(document.getElementById('a-qty').value);
+  const expiry = document.getElementById('a-expiry').value;
+  if (!name || !vendorName || !expiry || !qty) { toast('請填寫商品名稱、廠商、到貨量、有效期限'); return; }
+
+  const v = vendors.find(x => x.name === vendorName);
+  const canReturn = v && v.rule !== 'no';
+  const deadline = canReturn ? addMonths(expiry, v.months) : null;
+
+  arrivals.unshift({ id: nextAId++, name, vendor: vendorName, batch: batch || '—', qty, expiry, deadline, canReturn });
+  persist();
+  renderArrivalTable();
+  clearArrivalForm();
+  toast(`✓ 已登記：${name}`);
+}
+
+function clearArrivalForm() {
+  ['a-name','a-batch','a-qty','a-expiry','a-deadline'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('a-vendor').value = '';
+  document.getElementById('a-rule-hint').style.display = 'none';
+}
+
+function deleteArrival(id) {
+  if (!confirm('確定要刪除這筆到貨紀錄？')) return;
+  arrivals = arrivals.filter(a => a.id !== id);
+  persist(); renderArrivalTable(); toast('已刪除');
+}
+
+function renderArrivalTable() {
+  const tb = document.getElementById('arrival-table');
+  if (!arrivals.length) { tb.innerHTML = '<tr><td colspan="8" class="empty">尚無到貨紀錄</td></tr>'; return; }
+  tb.innerHTML = arrivals.slice(0, 20).map(a => `
+    <tr>
+      <td style="font-weight:500">${a.name}</td>
+      <td>${a.vendor}</td>
+      <td class="mono">${a.batch}</td>
+      <td class="mono">${a.qty}</td>
+      <td class="mono">${fmt(a.expiry)}</td>
+      <td class="mono">${a.canReturn ? fmt(a.deadline) : '<span class="tag tag-gray">不可退</span>'}</td>
+      <td>${statusTag(a)}</td>
+      <td><button class="btn btn-danger" onclick="deleteArrival(${a.id})">刪除</button></td>
+    </tr>`).join('');
+}
+
+// ── Inventory ──
+function renderInventory() {
+  const q = document.getElementById('inv-search').value.toLowerCase();
+  const f = document.getElementById('inv-filter').value;
+  let data = arrivals.filter(a => {
+    const match = a.name.toLowerCase().includes(q) || a.vendor.toLowerCase().includes(q);
+    const st = getStatus(a);
+    return match && (!f || st === f);
+  });
+  const tb = document.getElementById('inventory-table');
+  if (!data.length) { tb.innerHTML = '<tr><td colspan="9" class="empty">沒有符合條件的批次</td></tr>'; return; }
+  tb.innerHTML = data.map(a => {
+    const rate = salesMap[a.name];
+    const days = estSellDays(a);
+    const dl = daysFrom(a.deadline);
+    const sellWarn = rate && days && a.deadline && days > dl;
+    return `<tr>
+      <td style="font-weight:500">${a.name}</td>
+      <td style="color:var(--text2)">${a.vendor}</td>
+      <td class="mono">${a.batch}</td>
+      <td class="mono">${a.qty}</td>
+      <td class="mono" style="color:${sellWarn?'var(--red)':'var(--text2)'}">${rate ? rate.toFixed(1)+'/天' : '—'}</td>
+      <td class="mono" style="color:${sellWarn?'var(--red)':'inherit'}">${days ? days+'天後' : '—'}</td>
+      <td class="mono">${fmt(a.expiry)}</td>
+      <td class="mono">${a.canReturn ? fmt(a.deadline) : '不可退'}</td>
+      <td>${statusTag(a)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Sales Import ──
+function switchSalesTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sales-tab-import').style.display = tab === 'import' ? '' : 'none';
+  document.getElementById('sales-tab-manual').style.display = tab === 'manual' ? '' : 'none';
+}
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+function handleFileUpload(e) { handleFile(e.target.files[0]); }
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'binary', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { raw: false });
+    pendingImport = data;
+
+    const colName = document.getElementById('col-name').value.trim();
+    const colQty = document.getElementById('col-qty').value.trim();
+    const colDate = document.getElementById('col-date').value.trim();
+
+    const preview = data.slice(0, 5);
+    const heads = Object.keys(preview[0] || {});
+
+    const result = document.getElementById('import-result');
+    result.style.display = 'block';
+    result.innerHTML = `✓ 讀取成功：共 ${data.length} 筆紀錄，欄位：${heads.join('、')}`;
+
+    const pc = document.getElementById('preview-card');
+    pc.style.display = '';
+    document.getElementById('preview-table').innerHTML = `
+      <table><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${preview.map(r=>`<tr>${heads.map(h=>`<td>${r[h]??''}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>`;
+  };
+  reader.readAsBinaryString(file);
+}
+
+function confirmImport() {
+  if (!pendingImport) return;
+  const colName = document.getElementById('col-name').value.trim();
+  const colQty = document.getElementById('col-qty').value.trim();
+  const colDate = document.getElementById('col-date').value.trim();
+
+  const agg = {};
+  const dates = new Set();
+  pendingImport.forEach(r => {
+    const name = r[colName]; const qty = parseFloat(r[colQty]); const date = r[colDate];
+    if (!name || isNaN(qty)) return;
+    agg[name] = (agg[name] || 0) + qty;
+    if (date) dates.add(date.toString().slice(0,10));
+  });
+
+  const days = dates.size || 30;
+  Object.entries(agg).forEach(([name, total]) => { salesMap[name] = parseFloat((total / days).toFixed(2)); });
+  persist();
+  toast(`✓ 已更新 ${Object.keys(agg).length} 個商品的日均銷量（${days} 天資料）`);
+  cancelImport();
+  renderDashboard();
+}
+
+function cancelImport() {
+  pendingImport = null;
+  document.getElementById('preview-card').style.display = 'none';
+  document.getElementById('import-result').style.display = 'none';
+  document.getElementById('file-input').value = '';
+}
+
+function renderManualSales() {
+  const names = [...new Set(arrivals.map(a => a.name))];
+  const tb = document.getElementById('manual-sales-table');
+  if (!names.length) { tb.innerHTML = '<tr><td colspan="3" class="empty">尚無商品，請先到貨登記</td></tr>'; return; }
+  tb.innerHTML = names.map(n => `
+    <tr>
+      <td style="font-weight:500">${n}</td>
+      <td class="mono">${salesMap[n] ? salesMap[n].toFixed(1)+' / 天' : '—'}</td>
+      <td><div style="display:flex;gap:6px;align-items:center;">
+        <input type="number" step="0.1" min="0" id="ms-${n.replace(/\s/g,'_')}" value="${salesMap[n]||''}" placeholder="0.0"
+          style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:var(--mono);font-size:13px;background:var(--bg);outline:none;">
+        <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="saveManualSale('${n}')">儲存</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+function saveManualSale(name) {
+  const key = name.replace(/\s/g,'_');
+  const val = parseFloat(document.getElementById('ms-'+key).value);
+  if (isNaN(val) || val < 0) { toast('請輸入有效數值'); return; }
+  salesMap[name] = val; persist();
+  toast(`✓ 已更新 ${name} 日均銷量 = ${val}/天`);
+  renderManualSales();
+}
+
+// ── Vendors ──
+function toggleVendorRule() {
+  const r = document.getElementById('v-rule').value;
+  document.getElementById('v-months-field').style.display = r === 'no' ? 'none' : '';
+}
+
+function addVendor() {
+  const name = document.getElementById('v-name').value.trim();
+  const rule = document.getElementById('v-rule').value;
+  const months = parseInt(document.getElementById('v-months').value);
+  const note = document.getElementById('v-note').value.trim();
+  if (!name) { toast('請輸入廠商名稱'); return; }
+  if (rule === 'months' && (!months || months < 1)) { toast('請輸入退貨月數'); return; }
+  if (vendors.find(v => v.name === name)) { toast('廠商已存在'); return; }
+  vendors.push({ id: nextVId++, name, rule, months: rule === 'months' ? months : null, note });
+  persist(); renderVendors();
+  ['v-name','v-months','v-note'].forEach(id => document.getElementById(id).value = '');
+  toast(`✓ 已新增廠商：${name}`);
+}
+
+function deleteVendor(id) {
+  const v = vendors.find(x => x.id === id);
+  if (arrivals.some(a => a.vendor === v.name)) { toast('此廠商有到貨紀錄，無法刪除'); return; }
+  if (!confirm(`確定要刪除「${v.name}」？`)) return;
+  vendors = vendors.filter(x => x.id !== id);
+  persist(); renderVendors(); toast('已刪除');
+}
+
+function renderVendors() {
+  const tb = document.getElementById('vendor-table');
+  if (!vendors.length) { tb.innerHTML = '<tr><td colspan="5" class="empty">尚無廠商設定</td></tr>'; return; }
+  tb.innerHTML = vendors.map(v => {
+    const count = arrivals.filter(a => a.vendor === v.name).length;
+    const ruleText = v.rule === 'no' ? `<span class="tag tag-gray">不可退</span>` :
+      `<span class="tag tag-blue">效期前 ${v.months} 個月</span>`;
+    return `<tr>
+      <td style="font-weight:500">${v.name}</td>
+      <td>${ruleText}</td>
+      <td style="color:var(--text2);font-size:12px">${v.note || '—'}</td>
+      <td class="mono">${count} 筆</td>
+      <td><button class="btn btn-danger" onclick="deleteVendor(${v.id})">刪除</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Init ──
+renderDashboard();
+renderVendors();
+populateVendorDropdown();
+</script>
+</body>
+</html>
